@@ -1,0 +1,59 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Environment
+.env
+.venv/
+*.pyc
+*.pyo
+
+# Vector store — regenerate with: uv run scripts/ingest.py --reset
+chroma_db/
+
+# Eval results — generated output
+evaluation/results/
+
+# Evaluation test questions v1 & v2
+evaluation/tests.jsonl
+evaluation/tests_v2.jsonl
+
+# Knowledge base documents — provide your own
+knowledge-base/markdown/*.md
+!knowledge-base/markdown/README.md
+knowledge-base/raw_docs/
+
+# Diagnostic results
+scripts/diagnostics/results
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.egg-info/
+
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
+
+# uv
+.uv/
+.python-version
+
+# Langfuse local config
+.langfuse/
+
+# t-SNE diagnostic outputs — generated, not source
+tsne_*.html
+tsne_*.png
+
+# Sc diagnostic outputs — generated, not source
+sc_*.html
+
