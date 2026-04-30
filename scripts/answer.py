@@ -3,8 +3,8 @@ answer.py — Auditor Expert retrieval and answer generation pipeline
 
 Architecture:
 1. Query rewrite (Claude Haiku) — expands conversational question to retrieval-optimised form
-2. ChromaDB retrieval (BGE embeddings, K=30)
-3. BGE cross-encoder reranking — local, free, ~2s after warmup
+2. ChromaDB retrieval (text-embedding-3-small, K=30)
+3. BGE cross-encoder reranking — BAAI/bge-reranker-v2-m3
 4. Answer generation (GPT-4o-mini) — streaming, grounded in retrieved context
 5. Groundedness check (Claude Haiku) — strips hallucinated claims
 
@@ -15,6 +15,7 @@ Judge model for eval: claude-sonnet-4-6 (per starter prompt).
 import json
 import os
 from typing import Generator, Optional
+import time
 
 import anthropic
 import chromadb
@@ -28,15 +29,15 @@ load_dotenv()
 
 COLLECTION_NAME = "auditor_expert"
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
-EMBED_MODEL = "BAAI/bge-large-en-v1.5"
+EMBED_MODEL = "text-embedding-3-small"
 
 RETRIEVAL_K = 30          # candidates for BGE reranker — more = better final ranking
-RERANK_TOP_N = 5          # final chunks passed to answer model
-RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+RERANK_TOP_N = 7          # final chunks passed to answer model
+RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 
-REWRITE_MODEL = "claude-haiku-4-5"
-ANSWER_MODEL = "gpt-4o-mini"
-CHECKER_MODEL = "claude-haiku-4-5"
+REWRITE_MODEL = "openai/gpt-oss-120b"      # was claude-haiku-4-5
+ANSWER_MODEL  = "openai/gpt-oss-120b"      # was gpt-4o-mini
+CHECKER_MODEL = "openai/gpt-oss-20b"       # was claude-haiku-4-5
 JUDGE_MODEL = "claude-sonnet-4-6"   # per starter prompt — NOT 4.5
 
 ANSWER_SYSTEM = """You are an expert ISO 9001 / IATF 16949 / AS9100 auditor with 20 years of experience in manufacturing quality management, supplier auditing, and NCR writing.
@@ -50,12 +51,17 @@ CRITICAL — GROUNDEDNESS RULE:
 - Do NOT add generic audit advice unless it is explicitly stated in the retrieved context
 - Do NOT substitute from general knowledge when a chunk is incomplete — omit the claim entirely
 - If a sequential process or numbered list is in the context, reproduce it in full and in order
+- If the question asks "what are the X types/elements/domains/steps", enumerate ALL of them from the context — do not summarise or truncate the list
+- Always include clause numbers and document references when they appear in the retrieved context
 - Shorter, fully-grounded answers are better than longer mixed answers
 - If the question cannot be answered from the provided context, say so explicitly: "The knowledge base does not contain information on this specific question."
 
 FORMAT:
 - Answer in clear prose unless the context contains a numbered list or table — then reproduce that structure
-- Cite the source document name in brackets when referencing a specific requirement, e.g. [audit_reporting_communication.md]
+- ALWAYS cite the source document name AND clause number for every specific requirement, threshold, or process step you state, e.g. [audit_reporting_communication.md, ISO 19011 clause 6.6]
+- If a clause number appears anywhere in the retrieved context, it MUST appear in your answer
+- Never state a requirement, timeline, or threshold without a citation — if you cannot find a citation in the context, omit the claim entirely
+- When asked to grade a finding, classify a nonconformance, or assess NCR severity: always state the grade (observation/minor/major/critical), the specific clause violated, and the reasoning based on the grading criteria in the retrieved context
 - Do not use headers unless the answer covers multiple distinct topics"""
 
 CHECKER_SYSTEM = """You are a groundedness checker for an audit expert RAG system.
@@ -118,19 +124,21 @@ def rerank_chunks(query: str, chunks: list[dict]) -> list[dict]:
 
 # ── Query rewrite ─────────────────────────────────────────────────────────────
 
-def rewrite_query(client: anthropic.Anthropic, question: str) -> str:
+def rewrite_query(client: OpenAI, question: str) -> str:
     """Expand conversational question to retrieval-optimised form."""
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=REWRITE_MODEL,
             max_tokens=120,
             temperature=0,
-            system=REWRITE_SYSTEM,
-            messages=[{"role": "user", "content": question}]
+            messages=[
+                {"role": "system", "content": REWRITE_SYSTEM},
+                {"role": "user", "content": question}
+            ]
         )
-        return response.content[0].text.strip()
+        return response.choices[0].message.content.strip()
     except Exception:
-        return question  # graceful fallback to original
+        return question
 
 
 # ── Retrieval ─────────────────────────────────────────────────────────────────
@@ -162,28 +170,27 @@ def retrieve_chunks(collection, query: str, k: int = RETRIEVAL_K) -> list[dict]:
 # ── Groundedness checker ──────────────────────────────────────────────────────
 
 def check_groundedness(
-    client: anthropic.Anthropic,
+    client: OpenAI,
     answer: str,
     context: str
 ) -> str:
     """
-    Claude Haiku actor/critic — strips claims not supported by retrieved context.
+    Actor/critic — strips claims not supported by retrieved context.
     Returns cleaned answer.
     """
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=CHECKER_MODEL,
             max_tokens=2000,
             temperature=0,
-            system=CHECKER_SYSTEM,
-            messages=[{
-                "role": "user",
-                "content": f"CONTEXT:\n{context}\n\nANSWER TO CHECK:\n{answer}"
-            }]
+            messages=[
+                {"role": "system", "content": CHECKER_SYSTEM},
+                {"role": "user", "content": f"CONTEXT:\n{context}\n\nANSWER TO CHECK:\n{answer}"}
+            ]
         )
-        return response.content[0].text.strip()
+        return response.choices[0].message.content.strip()
     except Exception:
-        return answer  # graceful fallback
+        return answer
 
 
 # ── Answer generation (streaming) ─────────────────────────────────────────────
@@ -204,19 +211,27 @@ def answer_stream(
     4. Stream answer (GPT-4o-mini)
     5. Groundedness check (Claude Haiku)
     """
+    start_time = time.time()
     anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    groq_client = OpenAI(
+    api_key=os.environ.get("GROQ_API_KEY", ""),
+    base_url="https://api.groq.com/openai/v1"
+    )
 
     chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-    embed_fn = SentenceTransformerEmbeddingFunction(model_name=EMBED_MODEL)
+    from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+    embed_fn = OpenAIEmbeddingFunction(
+        api_key=os.environ["OPENAI_API_KEY"],
+        model_name=EMBED_MODEL
+    )
     collection = chroma_client.get_collection(
         name=COLLECTION_NAME,
         embedding_function=embed_fn
     )
 
     # Step 1 — query rewrite
-    retrieval_query = rewrite_query(anthropic_client, question)
+    retrieval_query = rewrite_query(groq_client, question)
     if langfuse_trace:
         langfuse_trace.span(name="query_rewrite", output={"rewritten": retrieval_query})
 
@@ -271,14 +286,26 @@ def answer_stream(
         yield full_answer  # Gradio streaming — yield cumulative text
 
     # Step 5 — groundedness check (post-stream, applies to final answer)
-    checked_answer = check_groundedness(anthropic_client, full_answer, context)
+    checked_answer = check_groundedness(groq_client, full_answer, context)
 
-    if langfuse_trace:
-        langfuse_trace.span(name="groundedness_check", output={
-            "original_length": len(full_answer),
-            "checked_length": len(checked_answer),
-            "changed": checked_answer != full_answer
-        })
+    try:
+        lf = Langfuse(
+            public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", ""),
+            secret_key=os.environ.get("LANGFUSE_SECRET_KEY", ""),
+            host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+        )
+        lf.create_event(
+            name="answer_stream",
+            input={"question": question, "rewritten_query": retrieval_query},
+            output={
+                "answer": checked_answer[:500],
+                "sources": [c["source"] for c in top_chunks],
+                "latency": round(time.time() - start_time, 2)
+            }
+        )
+        lf.flush()
+    except Exception:
+        pass
 
     # If checker modified the answer, yield the cleaned version
     if checked_answer != full_answer:
@@ -292,18 +319,26 @@ def answer(question: str) -> dict:
     Non-streaming answer for evaluation pipeline.
     Returns dict with answer text and retrieved sources.
     """
+    start_time = time.time()
     anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    groq_client = OpenAI(
+    api_key=os.environ.get("GROQ_API_KEY", ""),
+    base_url="https://api.groq.com/openai/v1"
+    )
 
     chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-    embed_fn = SentenceTransformerEmbeddingFunction(model_name=EMBED_MODEL)
+    from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+    embed_fn = OpenAIEmbeddingFunction(
+        api_key=os.environ["OPENAI_API_KEY"],
+        model_name=EMBED_MODEL
+    )
     collection = chroma_client.get_collection(
         name=COLLECTION_NAME,
         embedding_function=embed_fn
     )
 
-    retrieval_query = rewrite_query(anthropic_client, question)
+    retrieval_query = rewrite_query(groq_client, question)
     raw_chunks = retrieve_chunks(collection, retrieval_query)
     top_chunks = rerank_chunks(retrieval_query, raw_chunks)
 
@@ -329,10 +364,32 @@ def answer(question: str) -> dict:
     )
     raw_answer = response.choices[0].message.content
 
-    final_answer = check_groundedness(anthropic_client, raw_answer, context)
+    final_answer = check_groundedness(groq_client_client, raw_answer, context)
+
+    latency = round(time.time() - start_time, 2)
+
+    try:
+        lf = Langfuse(
+            public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", ""),
+            secret_key=os.environ.get("LANGFUSE_SECRET_KEY", ""),
+            host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+        )
+        lf.create_event(
+            name="answer",
+            input={"question": question, "rewritten_query": retrieval_query},
+            output={
+                "answer": final_answer[:500],
+                "sources": [c["source"] for c in top_chunks],
+                "latency": latency
+            }
+        )
+        lf.flush()
+    except Exception:
+        pass  # Langfuse optional — never block answer on observability failure
 
     return {
         "answer": final_answer,
         "sources": [c["source"] for c in top_chunks],
-        "retrieval_query": retrieval_query
+        "retrieval_query": retrieval_query,
+        "latency": latency
     }

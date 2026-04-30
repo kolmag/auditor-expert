@@ -6,11 +6,13 @@ Scores: 0–10 per question on correctness, completeness, groundedness, no hallu
 Output: per-question scores + category breakdown + overall score
 
 Usage:
-    uv run evaluation/eval.py                           # full 190-question eval
-    uv run evaluation/eval.py --category standard       # fast category check
-    uv run evaluation/eval.py --source developer        # developer questions only
-    uv run evaluation/eval.py --n 20                    # first N questions
-    uv run evaluation/eval.py --out results.json        # save results
+    uv run evaluation/eval.py                                   # tests_auditor.jsonl (default)
+    uv run evaluation/eval.py --file tests_external.jsonl       # external questions
+    uv run evaluation/eval.py --all                             # both files combined
+    uv run evaluation/eval.py --category standard               # fast category check
+    uv run evaluation/eval.py --source developer                # filter by source
+    uv run evaluation/eval.py --n 20                            # first N questions
+    uv run evaluation/eval.py --out results.json                # save results
 """
 
 import argparse
@@ -23,14 +25,13 @@ from pathlib import Path
 
 import anthropic
 from dotenv import load_dotenv
-from langfuse import Langfuse
 
 load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from answer import answer  # non-streaming version
 
-JUDGE_MODEL = "claude-sonnet-4-6"   # per starter prompt
+JUDGE_MODEL = "claude-sonnet-4-6"   # per starter prompt — NOT 4.5
 
 JUDGE_SYSTEM = """You are an expert evaluator for an ISO 9001 / IATF 16949 / AS9100 audit knowledge base system.
 
@@ -55,6 +56,17 @@ Return ONLY a JSON object with:
 }"""
 
 
+def load_questions(file_path: Path) -> list[dict]:
+    """Load questions from a JSONL file."""
+    questions = []
+    with open(file_path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                questions.append(json.loads(line))
+    return questions
+
+
 def judge_answer(
     client: anthropic.Anthropic,
     question: str,
@@ -65,11 +77,10 @@ def judge_answer(
     prompt = f"""Question: {question}
 Expected category: {expected_category}
 Answer to evaluate: {answer_text}"""
-
     try:
         response = client.messages.create(
             model=JUDGE_MODEL,
-            max_tokens=200,
+            max_tokens=300,   # increase from 200 — gives judge more room
             temperature=0,
             system=JUDGE_SYSTEM,
             messages=[{"role": "user", "content": prompt}]
@@ -78,6 +89,10 @@ Answer to evaluate: {answer_text}"""
         import re
         raw = re.sub(r"^```json\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
+        # Extract just the JSON object — ignore anything after closing brace
+        match = re.search(r'\{.*?\}', raw, re.DOTALL)
+        if match:
+            return json.loads(match.group())
         return json.loads(raw)
     except Exception as e:
         return {"score": 0, "reasoning": f"Judge error: {e}", "key_gap": "judge_failed"}
@@ -93,20 +108,10 @@ def run_eval(
     Returns summary dict with scores by category.
     """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    langfuse = Langfuse(
-        public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", ""),
-        secret_key=os.environ.get("LANGFUSE_SECRET_KEY", ""),
-        host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
-    )
 
     results = []
     scores_by_category = defaultdict(list)
     scores_by_source = defaultdict(list)
-
-    trace = langfuse.trace(
-        name="eval_run",
-        metadata={"n_questions": len(questions), "judge": JUDGE_MODEL}
-    )
 
     print(f"\n{'='*65}")
     print(f"Auditor Expert — Evaluation Run")
@@ -150,7 +155,7 @@ def run_eval(
             print(f"  {status} [{i:03d}/{len(questions)}] {qid} | {expected_cat:<16} "
                   f"| score={score:2d} | {judgment.get('reasoning', '')[:60]}")
 
-        # Rate limiting — be gentle on the API
+        # Rate limiting
         time.sleep(0.3)
 
     # Summary
@@ -174,7 +179,7 @@ def run_eval(
             for src, scores in sorted(scores_by_source.items())
         },
         "score_distribution": {
-            "10": sum(1 for s in all_scores if s == 10),
+            "10":  sum(1 for s in all_scores if s == 10),
             "8-9": sum(1 for s in all_scores if 8 <= s <= 9),
             "6-7": sum(1 for s in all_scores if 6 <= s <= 7),
             "4-5": sum(1 for s in all_scores if 4 <= s <= 5),
@@ -196,9 +201,6 @@ def run_eval(
     print(f"\nScore distribution: {summary['score_distribution']}")
     print(f"{'='*65}\n")
 
-    trace.update(output=summary)
-    trace.task_manager.flush()
-
     # Save
     if out_path:
         output = {"summary": summary, "results": results}
@@ -210,11 +212,17 @@ def run_eval(
 
 
 def main():
+    eval_dir = Path(__file__).parent
+
     parser = argparse.ArgumentParser(description="Auditor Expert evaluation")
+    parser.add_argument("--file", type=str, default="tests_auditor.jsonl",
+                        help="Test file in evaluation/ dir (default: tests_auditor.jsonl)")
+    parser.add_argument("--all", action="store_true",
+                        help="Run both tests_auditor.jsonl and tests_external.jsonl combined")
     parser.add_argument("--category", type=str, default=None,
                         help="Filter by expected_category")
     parser.add_argument("--source", type=str, default=None,
-                        help="Filter by source (developer / blind_practitioner / adversarial)")
+                        help="Filter by source")
     parser.add_argument("--n", type=int, default=None,
                         help="Run only first N questions")
     parser.add_argument("--out", type=str, default=None,
@@ -223,14 +231,24 @@ def main():
                         help="Suppress per-question output")
     args = parser.parse_args()
 
-    # Load test set
-    test_file = Path(__file__).parent / "tests_auditor.jsonl"
-    questions = []
-    with open(test_file) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                questions.append(json.loads(line))
+    # Load questions
+    if args.all:
+        questions = []
+        for fname in ["tests_auditor.jsonl", "tests_external.jsonl"]:
+            fpath = eval_dir / fname
+            if not fpath.exists():
+                print(f"⚠ Not found, skipping: {fpath}")
+                continue
+            batch = load_questions(fpath)
+            questions.extend(batch)
+            print(f"✓ Loaded {len(batch)} questions from {fname}")
+    else:
+        fpath = eval_dir / args.file
+        if not fpath.exists():
+            print(f"✗ File not found: {fpath}")
+            sys.exit(1)
+        questions = load_questions(fpath)
+        print(f"✓ Loaded {len(questions)} questions from {args.file}")
 
     # Apply filters
     if args.category:

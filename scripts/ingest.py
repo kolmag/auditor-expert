@@ -43,7 +43,7 @@ CHUNK_OVERLAP = 40        # 10% overlap
 HEADER_MAX_TOKENS = 800   # sections larger than this fall back to token splitting
 
 ENRICHMENT_MODEL = "claude-haiku-4-5"   # fast, cheap, deterministic at temp=0
-EMBED_MODEL = "BAAI/bge-large-en-v1.5"
+EMBED_MODEL = "text-embedding-3-small"  # OpenAI
 
 ENRICHMENT_PROMPT = """You are an expert ISO 9001 / IATF 16949 / AS9100 auditor with 20 years of experience.
 
@@ -210,8 +210,10 @@ def ingest(reset: bool = False) -> None:
     chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 
     # ── Embedding function ────────────────────────────────────────────────────
-    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-    embed_fn = SentenceTransformerEmbeddingFunction(model_name=EMBED_MODEL)
+    from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+    embed_fn = OpenAIEmbeddingFunction(
+        api_key=os.environ["OPENAI_API_KEY"],
+        model_name=EMBED_MODEL)
 
     # ── Collection ────────────────────────────────────────────────────────────
     if reset:
@@ -242,7 +244,6 @@ def ingest(reset: bool = False) -> None:
     print(f"✓ Found {len(md_files)} documents\n")
 
     total_chunks = 0
-    trace = langfuse.trace(name="ingest", metadata={"mode": "reset" if reset else "upsert"})
 
     for doc_path in md_files:
         text = doc_path.read_text(encoding="utf-8")
@@ -250,8 +251,6 @@ def ingest(reset: bool = False) -> None:
         chunks = split_into_chunks(text)
 
         print(f"  {doc_path.name} [{doc_category}] → {len(chunks)} chunks")
-
-        doc_span = trace.span(name=f"doc_{doc_path.stem}", metadata={"category": doc_category})
 
         for i, chunk_text in enumerate(chunks):
             chunk_id = f"{doc_path.stem}_{i:04d}"
@@ -286,10 +285,10 @@ def ingest(reset: bool = False) -> None:
             )
             total_chunks += 1
 
-        doc_span.end()
-
-    trace.update(output={"total_chunks": total_chunks, "documents": len(md_files)})
-    trace.task_manager.flush()
+    try:
+        langfuse.flush()
+    except Exception:
+        pass
 
     print(f"\n{'='*60}")
     print(f"✓ Ingestion complete")

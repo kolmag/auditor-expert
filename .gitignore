@@ -15,12 +15,19 @@ wheels/
 # Vector store — regenerate with: uv run scripts/ingest.py --reset
 chroma_db/
 
+# Colab
+*.ipynb
+
 # Eval results — generated output
 evaluation/results/
+
+# Benchmark results
+evaluation/benchmark_results/
 
 # Evaluation test questions v1 & v2
 evaluation/tests.jsonl
 evaluation/tests_v2.jsonl
+evaluation/tests_g*.jsonl
 
 # Knowledge base documents — provide your own
 knowledge-base/markdown/*.md

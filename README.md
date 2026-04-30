@@ -1,139 +1,270 @@
 # Auditor Expert
 
-RAG-powered ISO 9001 / IATF 16949 / AS9100 audit knowledge base.
+**RAG-based expert Q&A assistant for ISO 9001 / IATF 16949 / AS9100D audit knowledge**
 
-**Pipeline:** BGE embeddings → LLM-enriched chunks → ChromaDB → BGE cross-encoder reranking → GPT-4o-mini generation → Claude Haiku groundedness check  
-**Judge model:** claude-sonnet-4-6  
-**KB:** 26 documents, ~50k words, 5 categories: standard / procedure / example / reference / general
+Part of an AI engineering portfolio targeting senior quality + AI leadership roles. Built with eval-driven iteration, multi-model benchmarking, and production-grade RAG architecture.
 
 ---
 
-## Quick Start
+## What it does
+
+Auditor Expert answers audit-domain questions the way a senior auditor would — grounded in specific clauses, evidence standards, and grading criteria. It supports:
+
+- **Clause interpretation** — "What does IATF 16949 clause 8.5.1.1 require for control plans?"
+- **NCR grading** — "Is a missing reaction plan for SPC a minor or major finding?"
+- **Evidence guidance** — "What evidence do I need to close a major NCR from a supplier audit?"
+- **Audit preparation** — "What will an AS9100D auditor ask about first article inspection?"
+- **Practitioner scenarios** — "My supplier submitted a CA that addresses the symptom, not the root cause — what do I do?"
+
+The system correctly declines out-of-scope questions (HR, pricing, legal, non-quality topics) and flags when the knowledge base cannot answer a question rather than hallucinating.
+
+---
+
+## Architecture
+
+```
+User query
+    ↓
+Query Rewriter (GPT-OSS-120B via Groq)
+    ↓
+ChromaDB retrieval — K=30 candidates
+text-embedding-3-small
+    ↓
+BGE reranker (BAAI/bge-reranker-v2-m3) — top 7
+    ↓
+Groundedness Checker (GPT-OSS-20B via Groq)
+    ↓
+Answer Generator (GPT-OSS-120B via Groq)
+    ↓
+Gradio streaming interface
+```
+
+**Judge (eval only):** Claude Sonnet 4.6
+
+---
+
+## Knowledge Base
+
+27 documents covering the full audit domain:
+
+| Category | Documents | Topics |
+|---|---|---|
+| `standard` | 10 | ISO 9001, IATF 16949, AS9100D clause requirements |
+| `procedure` | 9 | Audit planning, NCR writing, evidence collection, CA closure |
+| `example` | 3 | Worked examples with FINDING anchors (ISO 9001, IATF, supplier) |
+| `reference` | 4 | NCR grading criteria, checklists, process KPIs, audit types |
+| `general` | 1 | Practitioner scenarios, edge cases, clause interpretation disputes |
+
+**584 chunks** after enrichment (headline + summary + 3 practitioner queries per chunk).
+
+---
+
+## Evaluation
+
+**Eval set: 610 questions across 4 independent sources**
+
+| Source | N | Description |
+|---|---|---|
+| `developer` | 60 | Structured questions with expected sources and clause references |
+| `blind_practitioner` | 70 | Practitioner-phrased questions, no knowledge of document structure |
+| `adversarial` | 60 | Out-of-scope questions, edge cases, prompt injection attempts |
+| `external` (g1/g2/standard/forum) | 420 | Blind questions from multiple generators + real forum questions |
+
+---
+
+## Results
+
+### Ablation study — three runs
+
+| | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| Embeddings | BGE-large-en-v1.5 | text-embedding-3-small | text-embedding-3-small |
+| Reranker | ms-marco-MiniLM | bge-reranker-v2-m3 | bge-reranker-v2-m3 |
+| RERANK_TOP_N | 5 | 5 | 7 |
+| KB docs | 26 | 26 | 27 |
+| Answer model | GPT-4o-mini | GPT-4o-mini | GPT-4o-mini |
+| **Overall (190q)** | **6.800** | **7.511** | **7.584** |
+| **Overall (610q)** | — | **7.059** | **7.289** |
+| Median latency | ~12s (CPU) | 7.88s (GPU) | 9.65s (GPU) |
+
+Run 1 used the wrong embedding model and reranker — reframed as an ablation study. The +0.489 overall improvement from Run 1 → Run 2 is attributable entirely to the correct stack.
+
+### Multi-model benchmark — answer model comparison
+
+All runs: same retrieval stack, same 610-question eval set, same judge (Claude Sonnet 4.6).
+
+| Stack | Score | Latency | Actual cost/610q |
+|---|---|---|---|
+| **OSS-120B + OSS-120B rw + OSS-20B check** | **7.826** | 19.1s | **$2.46** |
+| OSS-120B + Haiku rw/check | 7.836 | 13.7s | $5.10 |
+| OSS-120B + DeepSeek Flash rw/check | 7.703 | 26.4s | $2.84 |
+| GPT-4o-mini + Haiku (baseline) | 7.289 | 9.7s | $4.77 |
+| Qwen3-32B (eliminated) | 6.992 | 13.8s | $5.31 |
+
+**Production recommendation: OSS-120B answer + OSS-120B rewriter + OSS-20B checker**
+
+- Same quality as OSS-120B + Haiku (delta: 0.010 — within judge variance)
+- 52% cheaper than the Haiku stack ($2.46 vs $5.10 per 610 queries)
+- 48% cheaper than the GPT-4o-mini baseline at +0.537 higher score
+- All models on Groq — single provider, no cross-API latency variance
+
+**Qwen3-32B eliminated:** OUT_OF_SCOPE pass rate 74% vs 96% baseline. Answers questions it should decline — disqualifying for a production audit assistant.
+
+### Benchmark scores by category (production stack, 610q)
+
+| Category | Score | Pass rate | vs Baseline |
+|---|---|---|---|
+| example | 8.474 | 95% | +1.053 |
+| general | 8.096 | 89% | +0.830 |
+| procedure | 7.717 | 88% | +0.765 |
+| reference | 7.283 | 71% | +0.348 |
+| standard | 7.164 | 72% | +0.507 |
+| OUT_OF_SCOPE | 9.436 | 94% | -0.205 |
+| **Overall** | **7.826** | **83%** | **+0.537** |
+
+### Key finding: rewriter leverage > answer model quality
+
+> OSS-20B answering with OSS-120B rewriting scored 8.033 (60q sample).
+> OSS-120B answering with Haiku rewriting scored 7.836 (full 610).
+>
+> A stronger rewriter surfaces better context, which improves answers even from a smaller model.
+> The rewriter has higher leverage than the answer model in this RAG architecture.
+
+---
+
+## Stack
+
+```python
+EMBED_MODEL    = "text-embedding-3-small"       # OpenAI
+RERANK_MODEL   = "BAAI/bge-reranker-v2-m3"      # HuggingFace local
+REWRITE_MODEL  = "openai/gpt-oss-120b"          # Groq
+ANSWER_MODEL   = "openai/gpt-oss-120b"          # Groq
+CHECKER_MODEL  = "openai/gpt-oss-20b"           # Groq
+JUDGE_MODEL    = "claude-sonnet-4-6"            # Anthropic (eval only)
+CHUNK_SIZE     = 400                            # BGE 512-token limit
+CHUNK_OVERLAP  = 40
+RETRIEVAL_K    = 30
+RERANK_TOP_N   = 7
+ENRICHMENT_TEMP = 0                             # deterministic embeddings
+ANSWER_TEMP    = 0                              # deterministic answers
+```
+
+---
+
+## Infrastructure cost analysis
+
+| Scenario | Cost/610q | Notes |
+|---|---|---|
+| Production stack (Groq only) | $0.40 | OSS-120B + OSS-20B answer+rw+check |
+| Judge (eval only) | $2.06 | Claude Sonnet 4.6 |
+| Full eval run | $2.46 | Production stack + judge |
+| Batch eval with DS Flash | $2.13 | DeepSeek Flash rw/check + judge, no answer model |
+
+**Cost at scale (production, no judge):**
+
+| Volume | Cost |
+|---|---|
+| 1,000 queries | ~$0.66 |
+| 10,000 queries | ~$6.56 |
+| 100,000 queries | ~$65.60 |
+
+Async implementation (not yet applied) would reduce latency ~40% with no cost impact.
+
+---
+
+## Project structure
+
+```
+auditor-expert/
+├── knowledge-base/
+│   └── markdown/          # 27 .md documents
+├── chroma_db/             # gitignored
+├── evaluation/
+│   ├── eval.py
+│   ├── benchmark.py
+│   ├── tests_auditor.jsonl    # 190 questions (developer + blind + adversarial)
+│   └── tests_external.jsonl   # 420 questions (g1/g2/standard/forum)
+└── scripts/
+    ├── ingest.py
+    ├── answer.py
+    ├── app.py
+    └── diagnostics/
+        ├── tsne_viz.py
+        └── sc_viz.py
+```
+
+---
+
+## Setup
 
 ```bash
-# 1. Install dependencies
+# Install
+git clone https://github.com/kolmag/auditor-expert
+cd auditor-expert
 uv sync
 
-# 2. Copy and fill in environment variables
+# Configure
 cp .env.example .env
+# Add: ANTHROPIC_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY
 
-# 3. Copy KB documents into knowledge-base/markdown/
-# (all 26 .md files — README.md is excluded automatically)
-
-# 4. Ingest (first time — full reset)
+# Ingest knowledge base
 uv run scripts/ingest.py --reset
 
-# 5. Run diagnostics
+# Run diagnostics
 uv run scripts/diagnostics/tsne_viz.py
 uv run scripts/diagnostics/sc_viz.py
 
-# 6. Run evaluation
-uv run evaluation/eval.py --category standard   # fast category check first
-uv run evaluation/eval.py                        # full 190-question eval
-
-# 7. Launch app
+# Launch app
 uv run scripts/app.py
 ```
 
 ---
 
-## Iteration Checklist (mandatory after every KB change)
+## Evaluation
 
-**Never skip steps. Never run full eval before category eval is clean.**
+```bash
+# Full 610-question eval (recommended)
+uv run evaluation/eval.py --all --out results_run.json
 
-1. `uv run scripts/ingest.py --reset` (full re-ingest) OR `--upsert` (additions only)
-2. `uv run scripts/diagnostics/tsne_viz.py` — check for category bleeding
-3. `uv run scripts/diagnostics/sc_viz.py` — check cross-category competition
-4. `uv run evaluation/eval.py --category [affected_category]` — fast check
-5. `uv run evaluation/eval.py` — full 190-question eval only after step 4 is clean
+# Developer questions only (60q)
+uv run evaluation/eval.py --source developer
 
-**Use `--upsert` for additions. Use `--reset` only when full regeneration is intended.**  
-**`--reset` destroys all existing embeddings — non-deterministic across sessions.**
+# Category-specific
+uv run evaluation/eval.py --category standard
 
----
-
-## Repo Structure
-
-```
-auditor-expert/
-├── .env.example
-├── .gitignore              ← chroma_db/, __pycache__, .env, *.html
-├── pyproject.toml
-├── README.md
-├── knowledge-base/
-│   └── markdown/           ← 26 .md documents + README.md placeholder
-├── chroma_db/              ← gitignored
-├── evaluation/
-│   ├── eval.py             ← Judge: claude-sonnet-4-6
-│   └── tests_auditor.jsonl ← 190 questions: developer + blind + adversarial
-└── scripts/
-    ├── ingest.py           ← CHUNK_SIZE=400, temp=0, header-aware chunking
-    ├── answer.py           ← K=30 retrieval, BGE rerank, streaming, checker
-    ├── app.py              ← Gradio Blocks, streaming, auditor persona
-    └── diagnostics/
-        ├── tsne_viz.py     ← 2D/3D embedding space visualisation
-        └── sc_viz.py       ← cosine similarity violin + heatmap + per-query
+# Multi-model benchmark
+uv run evaluation/benchmark.py --model gpt_oss_120b
+uv run evaluation/benchmark.py --results   # comparison table
 ```
 
 ---
 
-## KB Architecture
+## Lessons learned
 
-### Pipeline decisions (all lessons from CAPA/8D Expert applied from day one)
+Key findings from this project (full document: `LESSONS_LEARNED_AUDITOR_EXPERT.md`):
 
-| Decision | Value | Reason |
-|---|---|---|
-| CHUNK_SIZE | 400 tokens | BGE 512-token limit — prevents silent truncation |
-| Enrichment temperature | 0 | Deterministic embeddings — comparable eval scores |
-| Chunking | Markdown-header-aware | Preserves clause sections and numbered lists |
-| Embed text | headline + summary + queries + original | Single highest-leverage decision |
-| Retrieval K | 30 | More candidates for BGE to rerank |
-| Rerank top-N | 5 | Final chunks passed to answer model |
-| README exclusion | ✓ | git placeholder never ingested |
-| FINDING anchors | ✓ | All worked examples from day one |
-| Practitioner scenarios | ✓ | Every procedural document |
+1. **Correct stack before first ingest.** Run 1 used the wrong embedding model — cost a full re-ingest and one wasted eval run. Cross-reference the stack spec before writing a single line of `ingest.py`.
 
-### Document categories
+2. **Rewriter leverage > answer model.** The query rewriter has higher impact on retrieval quality than the answer model quality. Test rewriter candidates before answer models.
 
-| Category | Documents | Purpose |
-|---|---|---|
-| `standard` | 10 | Formal clause requirements |
-| `procedure` | 9 | Audit methodology and procedures |
-| `example` | 3 | Worked NCR examples with FINDING anchors |
-| `reference` | 3 | Decision tables, checklists, grading criteria |
-| `general` | 1 | Practitioner scenarios, edge cases, disputes |
+3. **CHUNK_SIZE=400 prevents silent truncation.** BGE tokenizer is ~1.15× GPT token count. CHUNK_SIZE=500 causes silent truncation of enriched chunks at BGE's 512-token limit.
+
+4. **temperature=0 on enrichment is non-negotiable.** Non-zero temperature produces different headlines on every re-ingest — scores become non-comparable across runs.
+
+5. **Langfuse from day one.** Trace-level debugging (which chunks ranked, what BGE scored) saves hours of guesswork. Test the connection before first ingest.
+
+6. **Always run 610 combined.** Never split developer and external eval sets into separate runs. One job, one cost, one comparable result.
+
+7. **Model selection framework.** Run judge elimination → component elimination (10q each) → 60q sample → full 610. Catching Qwen3's OUT_OF_SCOPE failure at question 2 instead of question 610 saves 90 minutes and $5.
 
 ---
 
-## Eval Design
+## About
 
-**190 questions across 3 sources — prevents eval overfitting:**
+Built by **Maggie (Magdalena Koleva)** — Quality & HSE Manager at Soitec Netherlands, 19 years in supplier quality and auditing across semiconductor, automotive, and medical device industries.
 
-| Source | Range | N | Design |
-|---|---|---|---|
-| Developer | t001–t060 | 60 | Structured, expected sources named |
-| Blind practitioner | t061–t130 | 70 | Conversational, no knowledge of doc structure |
-| Adversarial | t131–t190 | 60 | Out-of-scope (t131–150) + edge cases (t151–190) |
+Portfolio: AI-augmented quality leadership tools built for real domain problems.
 
-**Target scores (minimum acceptable):**
-
-| Category | Target |
-|---|---|
-| standard | ≥ 7.5 |
-| procedure | ≥ 7.0 |
-| example | ≥ 7.0 |
-| reference | ≥ 7.5 |
-| general | ≥ 6.5 |
-| OUT_OF_SCOPE | ≥ 8.0 (system must decline correctly) |
-
----
-
-## Key Lessons Applied (from CAPA/8D Expert)
-
-- **CHUNK_SIZE=400 not 500** — BGE tokenizer ≈ 1.15× GPT tokens; 500 GPT ≈ 575 BGE which truncates
-- **temperature=0 on enrichment** — without this eval scores measure enrichment randomness not KB quality
-- **`--upsert` not `--reset` for additions** — every `--reset` destroys existing embeddings
-- **FINDING anchors** — took example category MRR from 0.383 to 1.000 in CAPA/8D Expert
-- **Practitioner scenario sections** — formal SOP vocabulary and practitioner question vocabulary don't overlap; both needed
-- **t-SNE before eval** — skipping t-SNE caused the worst regression in CAPA/8D Expert
-- **Judge model is claude-sonnet-4-6** — scores NOT comparable to CAPA/8D Expert (different judge, different domain)
+- App 1: [CAPA/8D Expert](https://github.com/kolmag/capa-8d-expert) — overall 7.121/10, 197-question eval
+- App 2: [8D Expert Workbench](https://github.com/kolmag/8d-expert-workbench) — integrated builder + RAG
+- App 3: **Auditor Expert** — this repo

@@ -65,7 +65,7 @@ def run_tsne(embeddings: np.ndarray, n_components: int = 2) -> np.ndarray:
         n_components=n_components,
         perplexity=min(30, len(embeddings) // 4),
         random_state=42,
-        n_iter=1000,
+        max_iter=1000,
         verbose=1
     )
     return tsne.fit_transform(embeddings)
