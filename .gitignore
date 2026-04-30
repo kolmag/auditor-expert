@@ -24,6 +24,10 @@ evaluation/results/
 # Benchmark results
 evaluation/benchmark_results/
 
+# Lessons Learner and Production Architecture
+PRODUCTION_ARCHITECTURE.md
+LESSONS_LEARNED_AUDITOR_EXPERT.md
+
 # Evaluation test questions v1 & v2
 evaluation/tests.jsonl
 evaluation/tests_v2.jsonl

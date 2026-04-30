@@ -239,6 +239,16 @@ uv run evaluation/benchmark.py --results   # comparison table
 
 ---
 
+## Documentation
+
+**`PRODUCTION_ARCHITECTURE.md`** — Full stack specification, model selection rationale, async pipeline design, cost analysis, and re-ingest checklist.
+
+**`LESSONS_LEARNED_AUDITOR_EXPERT.md`** — Project retrospective covering KB architecture decisions, evaluation process lessons, benchmark findings, and start-clean checklist for App 4.
+
+**`MODEL_SELECTION_FRAMEWORK.md`** — Reusable 7-step framework for RAG pipeline model selection: judge elimination → component elimination → 60-question sample → full benchmark → Pareto frontier → production recommendation.
+
+---
+
 ## Lessons learned
 
 Key findings from this project (full document: `LESSONS_LEARNED_AUDITOR_EXPERT.md`):
@@ -256,6 +266,43 @@ Key findings from this project (full document: `LESSONS_LEARNED_AUDITOR_EXPERT.m
 6. **Always run 610 combined.** Never split developer and external eval sets into separate runs. One job, one cost, one comparable result.
 
 7. **Model selection framework.** Run judge elimination → component elimination (10q each) → 60q sample → full 610. Catching Qwen3's OUT_OF_SCOPE failure at question 2 instead of question 610 saves 90 minutes and $5.
+
+---
+
+## From Portfolio to Production
+
+This project is production-quality in architecture and evaluation rigour, but several components would need to change for industrial deployment:
+
+**Security & access control**
+- API key management via secrets manager (AWS Secrets Manager, Azure Key Vault) — not `.env` files
+- Role-based access control — not all auditors should access all audit programmes
+- Audit trail for all queries and answers — regulatory requirement in some industries
+
+**Scalability**
+- Move ChromaDB to a managed vector store (Pinecone, Weaviate, Qdrant Cloud) for multi-user concurrent access
+- Containerise with Docker, deploy on Kubernetes or managed container service
+- Rate limiting and request queuing for high-volume usage
+
+**Knowledge base management**
+- Document versioning — when a standard is revised (e.g. ISO 9001:2025), chunks must be updated and re-ingested without losing audit history
+- Access controls on KB content — customer-specific requirements may be confidential
+- Scheduled re-ingestion when source standards are updated
+
+**Reliability**
+- Fallback models if primary provider (Groq) is unavailable
+- Response caching for frequently asked questions
+- Health checks and uptime monitoring
+- Async retry logic with exponential backoff on API failures
+
+**Compliance**
+- Data residency requirements — some industries require data to stay within specific regions
+- GDPR considerations for any user query logging
+- Audit log retention policy aligned with quality system record retention requirements
+
+**Evaluation in production**
+- Online evaluation via user feedback (thumbs up/down) rather than offline judge-only scoring
+- A/B testing framework for model updates
+- Drift detection — monitor if answer quality degrades as KB grows or standards change
 
 ---
 
