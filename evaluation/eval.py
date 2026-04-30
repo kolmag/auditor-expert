@@ -126,7 +126,8 @@ def run_eval(
 
         # Get answer
         try:
-            result = answer(question)
+            import asyncio
+            result = asyncio.run(answer(question))
             answer_text = result["answer"]
         except Exception as e:
             answer_text = f"ERROR: {e}"

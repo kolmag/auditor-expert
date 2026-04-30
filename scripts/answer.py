@@ -1,27 +1,26 @@
 """
 answer.py — Auditor Expert retrieval and answer generation pipeline
 
-Architecture:
-1. Query rewrite (Claude Haiku) — expands conversational question to retrieval-optimised form
+Architecture (Async):
+1. Query rewrite (GPT-OSS) — expands question (Cached for repeats)
 2. ChromaDB retrieval (text-embedding-3-small, K=30)
 3. BGE cross-encoder reranking — BAAI/bge-reranker-v2-m3
-4. Answer generation (GPT-4o-mini) — streaming, grounded in retrieved context
-5. Groundedness check (Claude Haiku) — strips hallucinated claims
+4. Answer generation (GPT-OSS) — streaming, grounded in context
+5. Groundedness check & Judge Eval — parallelized where applicable
 
 All LLM calls at temperature=0 for consistency.
-Judge model for eval: claude-sonnet-4-6 (per starter prompt).
 """
 
-import json
 import os
-from typing import Generator, Optional
 import time
+import asyncio
+from typing import AsyncGenerator, Optional
 
-import anthropic
+from anthropic import AsyncAnthropic
 import chromadb
 from dotenv import load_dotenv
 from langfuse import Langfuse
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 load_dotenv()
 
@@ -31,14 +30,14 @@ COLLECTION_NAME = "auditor_expert"
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
 EMBED_MODEL = "text-embedding-3-small"
 
-RETRIEVAL_K = 30          # candidates for BGE reranker — more = better final ranking
-RERANK_TOP_N = 7          # final chunks passed to answer model
+RETRIEVAL_K = 30          
+RERANK_TOP_N = 7          
 RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 
-REWRITE_MODEL = "openai/gpt-oss-120b"      # was claude-haiku-4-5
-ANSWER_MODEL  = "openai/gpt-oss-120b"      # was gpt-4o-mini
-CHECKER_MODEL = "openai/gpt-oss-20b"       # was claude-haiku-4-5
-JUDGE_MODEL = "claude-sonnet-4-6"   # per starter prompt — NOT 4.5
+REWRITE_MODEL = "openai/gpt-oss-120b"      
+ANSWER_MODEL  = "openai/gpt-oss-120b"      
+CHECKER_MODEL = "openai/gpt-oss-20b"       
+JUDGE_MODEL = "claude-sonnet-4-6"   
 
 ANSWER_SYSTEM = """You are an expert ISO 9001 / IATF 16949 / AS9100 auditor with 20 years of experience in manufacturing quality management, supplier auditing, and NCR writing.
 
@@ -87,6 +86,15 @@ Rules:
 - Keep the rewritten query concise — under 60 words
 - Return ONLY the rewritten query — no explanation"""
 
+JUDGE_SYSTEM = """You are an expert evaluator grading an AI's response to an audit question.
+Evaluate if the answer is accurate, helpful, and directly addresses the user's question based strictly on the provided context.
+Return a brief 1-2 sentence evaluation summary and a score out of 10."""
+
+
+# ── In-Memory Cache ───────────────────────────────────────────────────────────
+
+_QUERY_CACHE = {}
+
 
 # ── BGE Reranker ──────────────────────────────────────────────────────────────
 
@@ -106,12 +114,8 @@ def get_reranker():
         print(f"⚠ BGE reranker unavailable ({e}) — using embedding scores only")
         return None
 
-
 def rerank_chunks(query: str, chunks: list[dict]) -> list[dict]:
-    """
-    Rerank retrieved chunks using BGE cross-encoder.
-    Falls back to original embedding order if reranker unavailable.
-    """
+    """Rerank retrieved chunks using BGE cross-encoder."""
     reranker = get_reranker()
     if reranker is None or not chunks:
         return chunks[:RERANK_TOP_N]
@@ -122,12 +126,15 @@ def rerank_chunks(query: str, chunks: list[dict]) -> list[dict]:
     return [c for _, c in ranked[:RERANK_TOP_N]]
 
 
-# ── Query rewrite ─────────────────────────────────────────────────────────────
+# ── Async Pipeline Components ─────────────────────────────────────────────────
 
-def rewrite_query(client: OpenAI, question: str) -> str:
-    """Expand conversational question to retrieval-optimised form."""
+async def rewrite_query(client: AsyncOpenAI, question: str) -> str:
+    """Expand conversational question to retrieval-optimised form (with caching)."""
+    if question in _QUERY_CACHE:
+        return _QUERY_CACHE[question]
+
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=REWRITE_MODEL,
             max_tokens=120,
             temperature=0,
@@ -136,21 +143,25 @@ def rewrite_query(client: OpenAI, question: str) -> str:
                 {"role": "user", "content": question}
             ]
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        result = content.strip() if content and content.strip() else question
     except Exception:
-        return question
+        result = question
 
+    _QUERY_CACHE[question] = result
+    return result
 
-# ── Retrieval ─────────────────────────────────────────────────────────────────
-
-def retrieve_chunks(collection, query: str, k: int = RETRIEVAL_K) -> list[dict]:
-    """Query ChromaDB and return top-K chunks with metadata."""
+def retrieve_chunks_sync(collection, query: str, k: int = RETRIEVAL_K) -> list[dict]:
+    """Query ChromaDB (synchronous wrapped for threadpool)."""
     results = collection.query(
         query_texts=[query],
         n_results=k,
         include=["documents", "metadatas", "distances"]
     )
     chunks = []
+    if not results["documents"] or not results["documents"][0]:
+        return chunks
+        
     for doc, meta, dist in zip(
         results["documents"][0],
         results["metadatas"][0],
@@ -158,28 +169,16 @@ def retrieve_chunks(collection, query: str, k: int = RETRIEVAL_K) -> list[dict]:
     ):
         chunks.append({
             "embed_text": doc,
-            "original_text": meta.get("original_text", doc),
-            "source": meta.get("source", ""),
-            "doc_category": meta.get("doc_category", ""),
-            "headline": meta.get("headline", ""),
+            "original_text": meta.get("original_text", doc) if meta else doc,
+            "source": meta.get("source", "") if meta else "",
             "distance": dist
         })
     return chunks
 
-
-# ── Groundedness checker ──────────────────────────────────────────────────────
-
-def check_groundedness(
-    client: OpenAI,
-    answer: str,
-    context: str
-) -> str:
-    """
-    Actor/critic — strips claims not supported by retrieved context.
-    Returns cleaned answer.
-    """
+async def check_groundedness(client: AsyncOpenAI, answer: str, context: str) -> str:
+    """Actor/critic — strips claims not supported by retrieved context."""
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=CHECKER_MODEL,
             max_tokens=2000,
             temperature=0,
@@ -192,31 +191,44 @@ def check_groundedness(
     except Exception:
         return answer
 
+async def run_judge(client: AsyncAnthropic, answer: str, question: str, context: str) -> str:
+    """Evaluate the generated response (For Evaluation Pipeline)."""
+    try:
+        response = await client.messages.create(
+            model=JUDGE_MODEL,
+            max_tokens=300,
+            temperature=0,
+            system=JUDGE_SYSTEM,
+            messages=[
+                {"role": "user", "content": f"CONTEXT:\n{context}\n\nQUESTION:\n{question}\n\nANSWER TO EVALUATE:\n{answer}"}
+            ]
+        )
+        return response.content[0].text
+    except Exception as e:
+        return f"Judge evaluation failed: {str(e)}"
 
-# ── Answer generation (streaming) ─────────────────────────────────────────────
 
-def answer_stream(
+# ── Answer generation (Production Streaming) ──────────────────────────────────
+
+async def answer_stream(
     question: str,
     history: Optional[list] = None,
     langfuse_trace=None
-) -> Generator[str, None, None]:
+) -> AsyncGenerator[str, None]:
     """
-    Full RAG pipeline with streaming.
-    Yields partial answer strings for Gradio streaming UI.
-
-    Pipeline:
-    1. Query rewrite
-    2. Retrieve K=30 chunks
-    3. BGE rerank → top 5
-    4. Stream answer (GPT-4o-mini)
-    5. Groundedness check (Claude Haiku)
+    Full RAG pipeline with streaming (Fully Async).
+    Note: Judge model is omitted here to maximize production UI speed.
     """
     start_time = time.time()
-    anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    groq_client = OpenAI(
-    api_key=os.environ.get("GROQ_API_KEY", ""),
-    base_url="https://api.groq.com/openai/v1"
+
+    if not question or not question.strip():
+        yield "Please provide a valid question."
+        return
+
+    openai_client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    groq_client = AsyncOpenAI(
+        api_key=os.environ.get("GROQ_API_KEY", ""),
+        base_url="https://api.groq.com/openai/v1"
     )
 
     chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
@@ -231,15 +243,14 @@ def answer_stream(
     )
 
     # Step 1 — query rewrite
-    retrieval_query = rewrite_query(groq_client, question)
+    retrieval_query = await rewrite_query(groq_client, question)
+    
     if langfuse_trace:
         langfuse_trace.span(name="query_rewrite", output={"rewritten": retrieval_query})
 
-    # Step 2 — retrieve
-    raw_chunks = retrieve_chunks(collection, retrieval_query)
-
-    # Step 3 — rerank
-    top_chunks = rerank_chunks(retrieval_query, raw_chunks)
+    # Step 2 & 3 — retrieve & rerank (non-blocking threadpool)
+    raw_chunks = await asyncio.to_thread(retrieve_chunks_sync, collection, retrieval_query)
+    top_chunks = await asyncio.to_thread(rerank_chunks, retrieval_query, raw_chunks)
 
     if not top_chunks:
         yield "The knowledge base does not contain information relevant to this question."
@@ -258,12 +269,15 @@ def answer_stream(
             "reranked": True
         })
 
-    # Build messages with optional conversation history
+    # Build messages
     messages = []
     if history:
-        for h in history[-4:]:  # last 4 turns for context window management
-            messages.append({"role": "user", "content": h[0]})
-            messages.append({"role": "assistant", "content": h[1]})
+        for h in history[-4:]:
+            if isinstance(h, dict):
+                messages.append({"role": h["role"], "content": h["content"]})
+            else:
+                if h[0]: messages.append({"role": "user", "content": h[0]})
+                if h[1]: messages.append({"role": "assistant", "content": h[1]})
 
     messages.append({
         "role": "user",
@@ -271,7 +285,7 @@ def answer_stream(
     })
 
     # Step 4 — stream answer
-    stream = openai_client.chat.completions.create(
+    stream = await groq_client.chat.completions.create(
         model=ANSWER_MODEL,
         messages=[{"role": "system", "content": ANSWER_SYSTEM}] + messages,
         temperature=0,
@@ -280,13 +294,13 @@ def answer_stream(
     )
 
     full_answer = ""
-    for chunk in stream:
+    async for chunk in stream:
         delta = chunk.choices[0].delta.content or ""
         full_answer += delta
-        yield full_answer  # Gradio streaming — yield cumulative text
+        yield full_answer
 
-    # Step 5 — groundedness check (post-stream, applies to final answer)
-    checked_answer = check_groundedness(groq_client, full_answer, context)
+    # Step 5 — Groundedness check (post-stream validation)
+    checked_answer = await check_groundedness(groq_client, full_answer, context)
 
     try:
         lf = Langfuse(
@@ -307,24 +321,27 @@ def answer_stream(
     except Exception:
         pass
 
-    # If checker modified the answer, yield the cleaned version
     if checked_answer != full_answer:
         yield checked_answer
 
 
-# ── Non-streaming version (for eval) ──────────────────────────────────────────
+# ── Answer generation (Evaluation Pipeline) ───────────────────────────────────
 
-def answer(question: str) -> dict:
+async def answer(question: str) -> dict:
     """
     Non-streaming answer for evaluation pipeline.
-    Returns dict with answer text and retrieved sources.
+    Runs checker and judge strictly in parallel for maximum speed.
     """
     start_time = time.time()
-    anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    groq_client = OpenAI(
-    api_key=os.environ.get("GROQ_API_KEY", ""),
-    base_url="https://api.groq.com/openai/v1"
+
+    if not question or not question.strip():
+        return {"answer": "Please provide a valid question.", "sources": []}
+        
+    anthropic_client = AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    openai_client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    groq_client = AsyncOpenAI(
+        api_key=os.environ.get("GROQ_API_KEY", ""),
+        base_url="https://api.groq.com/openai/v1"
     )
 
     chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
@@ -338,9 +355,10 @@ def answer(question: str) -> dict:
         embedding_function=embed_fn
     )
 
-    retrieval_query = rewrite_query(groq_client, question)
-    raw_chunks = retrieve_chunks(collection, retrieval_query)
-    top_chunks = rerank_chunks(retrieval_query, raw_chunks)
+    retrieval_query = await rewrite_query(groq_client, question)
+    
+    raw_chunks = await asyncio.to_thread(retrieve_chunks_sync, collection, retrieval_query)
+    top_chunks = await asyncio.to_thread(rerank_chunks, retrieval_query, raw_chunks)
 
     if not top_chunks:
         return {"answer": "The knowledge base does not contain information relevant to this question.", "sources": []}
@@ -356,7 +374,8 @@ def answer(question: str) -> dict:
         "content": f"Context from audit knowledge base:\n\n{context}\n\nQuestion: {question}"
     }]
 
-    response = openai_client.chat.completions.create(
+    # Await standard LLM generation
+    response = await openai_client.chat.completions.create(
         model=ANSWER_MODEL,
         messages=[{"role": "system", "content": ANSWER_SYSTEM}] + messages,
         temperature=0,
@@ -364,7 +383,11 @@ def answer(question: str) -> dict:
     )
     raw_answer = response.choices[0].message.content
 
-    final_answer = check_groundedness(groq_client_client, raw_answer, context)
+    # Run check and judge in parallel
+    final_answer, judge_feedback = await asyncio.gather(
+        check_groundedness(groq_client, raw_answer, context),
+        run_judge(anthropic_client, raw_answer, question, context)
+    )
 
     latency = round(time.time() - start_time, 2)
 
@@ -379,16 +402,18 @@ def answer(question: str) -> dict:
             input={"question": question, "rewritten_query": retrieval_query},
             output={
                 "answer": final_answer[:500],
+                "judge_feedback": judge_feedback,
                 "sources": [c["source"] for c in top_chunks],
                 "latency": latency
             }
         )
         lf.flush()
     except Exception:
-        pass  # Langfuse optional — never block answer on observability failure
+        pass
 
     return {
         "answer": final_answer,
+        "judge_feedback": judge_feedback,
         "sources": [c["source"] for c in top_chunks],
         "retrieval_query": retrieval_query,
         "latency": latency

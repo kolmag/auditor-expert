@@ -212,12 +212,20 @@ def init_pipeline(chroma_dir: str):
 
 def rewrite_query(question: str) -> str:
     try:
-        r = _anthropic_client.messages.create(
-            model="claude-haiku-4-5", max_tokens=120, temperature=0,
-            system=REWRITE_SYSTEM,
-            messages=[{"role": "user", "content": question}]
+        groq_client = OpenAI(
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+            base_url="https://api.groq.com/openai/v1"
         )
-        return r.content[0].text.strip()
+        r = groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            max_tokens=120,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": REWRITE_SYSTEM},
+                {"role": "user", "content": question}
+            ]
+        )
+        return r.choices[0].message.content.strip()
     except Exception:
         return question
 
@@ -279,12 +287,20 @@ def generate_answer_anthropic(model_id: str, question: str, context: str) -> str
 
 def check_groundedness(answer_text: str, context: str) -> str:
     try:
-        r = _anthropic_client.messages.create(
-            model="claude-haiku-4-5", max_tokens=2000, temperature=0,
-            system=CHECKER_SYSTEM,
-            messages=[{"role": "user", "content": f"CONTEXT:\n{context}\n\nANSWER TO CHECK:\n{answer_text}"}]
+        groq_client = OpenAI(
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+            base_url="https://api.groq.com/openai/v1"
         )
-        return r.content[0].text.strip()
+        r = groq_client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            max_tokens=2000,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": CHECKER_SYSTEM},
+                {"role": "user", "content": f"CONTEXT:\n{context}\n\nANSWER TO CHECK:\n{answer_text}"}
+            ]
+        )
+        return r.choices[0].message.content.strip()
     except Exception:
         return answer_text
 
