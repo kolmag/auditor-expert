@@ -261,7 +261,7 @@ Key findings from this project (full document: `LESSONS_LEARNED_AUDITOR_EXPERT.m
 
 ## About
 
-Built by **Maggie (Magdalena Koleva)** — Quality & HSE Manager at Soitec Netherlands, 19 years in supplier quality and auditing across semiconductor, automotive, and medical device industries.
+Built by **Maggie (Magdalena Koleva)** — Quality & HSE Manager, 20 years in supplier quality and auditing across semiconductor, automotive, and medical device industries.
 
 Portfolio: AI-augmented quality leadership tools built for real domain problems.
 
