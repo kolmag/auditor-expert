@@ -3,14 +3,14 @@
 {"id": "t003", "question": "When does a minor NCR escalate to a major? What is the pattern threshold?", "expected_category": "general", "source": "developer", "expected_sources": ["ncr_grading_edge_cases.md"]}
 {"id": "t004", "question": "What evidence is required to close a major NCR from a supplier audit?", "expected_category": "procedure", "source": "developer", "expected_sources": ["corrective_action_audit_closure.md"]}
 {"id": "t005", "question": "What are the five levels of root cause in a corrective action analysis?", "expected_category": "procedure", "source": "developer", "expected_sources": ["corrective_action_audit_closure.md"]}
-{"id": "t006", "question": "What is the corrective action response timeline for a critical NCR?", "expected_category": "procedure", "source": "developer", "expected_sources": ["corrective_action_audit_closure.md"]}
-{"id": "t007", "question": "What does IATF 16949 clause 9.2.2 require for the internal audit programme?", "expected_category": "standard", "source": "developer", "expected_sources": ["iatf16949_requirements.md", "internal_audit_programme.md"]}
+{"id": "t006", "question": "What is the corrective action response timeline for a critical NCR?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_planning_execution.md"]}
+{"id": "t007", "question": "What does IATF 16949 clause 9.2.2 require for the internal audit programme?", "expected_category": "standard", "source": "developer", "expected_sources": ["internal_audit_programme.md"]}
 {"id": "t008", "question": "What are the three audit types required by IATF 16949 and how do they differ?", "expected_category": "reference", "source": "developer", "expected_sources": ["process_vs_system_vs_product_audit.md"]}
 {"id": "t009", "question": "What is the difference between a process audit and a system audit?", "expected_category": "reference", "source": "developer", "expected_sources": ["process_vs_system_vs_product_audit.md"]}
 {"id": "t010", "question": "What is VDA 6.3 and what scoring thresholds determine pass or fail?", "expected_category": "reference", "source": "developer", "expected_sources": ["process_vs_system_vs_product_audit.md"]}
-{"id": "t011", "question": "What does ISO 9001 clause 9.2.1 require for internal audits?", "expected_category": "standard", "source": "developer", "expected_sources": ["iso9001_clause_guide.md"]}
+{"id": "t011", "question": "What does ISO 9001 clause 9.2.1 require for internal audits?", "expected_category": "standard", "source": "developer", "expected_sources": ["internal_audit_programme.md"]}
 {"id": "t012", "question": "What is the required content of an audit report under ISO 19011?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_reporting_communication.md"]}
-{"id": "t013", "question": "What must be covered at an audit closing meeting?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_reporting_communication.md"]}
+{"id": "t013", "question": "What must be covered at an audit closing meeting?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_planning_execution.md"]}
 {"id": "t014", "question": "How should a disputed finding be handled at the closing meeting?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_reporting_communication.md"]}
 {"id": "t015", "question": "What is the audit report delivery timeline for a major NCR finding?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_reporting_communication.md"]}
 {"id": "t016", "question": "What is effectiveness verification and when is an NCR formally closed?", "expected_category": "procedure", "source": "developer", "expected_sources": ["corrective_action_audit_closure.md"]}
@@ -30,21 +30,21 @@
 {"id": "t030", "question": "What does AS9100D require for configuration management?", "expected_category": "standard", "source": "developer", "expected_sources": ["as9100d_audit_requirements.md"]}
 {"id": "t031", "question": "What is First Article Inspection and when must it be repeated under AS9100D?", "expected_category": "standard", "source": "developer", "expected_sources": ["as9100d_audit_requirements.md"]}
 {"id": "t032", "question": "What does AS9100D require for counterfeit parts prevention?", "expected_category": "standard", "source": "developer", "expected_sources": ["as9100d_audit_requirements.md"]}
-{"id": "t033", "question": "Walk through worked example NCR-ISO-001 — what was the finding and why was it major?", "expected_category": "example", "source": "developer", "expected_sources": ["audit_worked_examples_iso9001.md"]}
-{"id": "t034", "question": "Walk through worked example NCR-IATF-003 — SPC without reaction plan grading rationale", "expected_category": "example", "source": "developer", "expected_sources": ["audit_worked_examples_iatf.md"]}
-{"id": "t035", "question": "Walk through NCR-SUP-005 — what makes a falsified CoC a critical NCR?", "expected_category": "example", "source": "developer", "expected_sources": ["audit_worked_examples_supplier.md"]}
+{"id": "t033", "question": "Walk through worked example NCR-ISO-001 \u2014 what was the finding and why was it major?", "expected_category": "example", "source": "developer", "expected_sources": ["audit_worked_examples_iso9001.md"]}
+{"id": "t034", "question": "Walk through worked example NCR-IATF-003 \u2014 SPC without reaction plan grading rationale", "expected_category": "example", "source": "developer", "expected_sources": ["audit_worked_examples_iatf.md"]}
+{"id": "t035", "question": "Walk through NCR-SUP-005 \u2014 what makes a falsified CoC a critical NCR?", "expected_category": "example", "source": "developer", "expected_sources": ["audit_worked_examples_supplier.md"]}
 {"id": "t036", "question": "What is the GR&R acceptance threshold and what does it mean if GR&R is 25%?", "expected_category": "standard", "source": "developer", "expected_sources": ["calibration_measurement_audit.md"]}
 {"id": "t037", "question": "What events require a new MSA to be conducted?", "expected_category": "standard", "source": "developer", "expected_sources": ["calibration_measurement_audit.md"]}
 {"id": "t038", "question": "What is the difference between calibration and measurement system analysis?", "expected_category": "standard", "source": "developer", "expected_sources": ["calibration_measurement_audit.md"]}
 {"id": "t039", "question": "What are the most common document control audit findings?", "expected_category": "standard", "source": "developer", "expected_sources": ["document_record_control_audit.md"]}
-{"id": "t040", "question": "How should records be corrected — why is correction fluid a finding?", "expected_category": "standard", "source": "developer", "expected_sources": ["document_record_control_audit.md"]}
+{"id": "t040", "question": "How should records be corrected \u2014 why is correction fluid a finding?", "expected_category": "standard", "source": "developer", "expected_sources": ["document_record_control_audit.md"]}
 {"id": "t041", "question": "What does ISO 9001 clause 9.1.2 require for customer satisfaction monitoring?", "expected_category": "standard", "source": "developer", "expected_sources": ["customer_satisfaction_audit.md"]}
 {"id": "t042", "question": "What additional customer satisfaction metrics does IATF 16949 clause 9.1.2.1 require?", "expected_category": "standard", "source": "developer", "expected_sources": ["customer_satisfaction_audit.md"]}
 {"id": "t043", "question": "What is the difference between continual improvement and corrective action under ISO 9001?", "expected_category": "standard", "source": "developer", "expected_sources": ["continual_improvement_audit.md"]}
 {"id": "t044", "question": "What evidence demonstrates genuine continual improvement versus improvement theatre?", "expected_category": "standard", "source": "developer", "expected_sources": ["continual_improvement_audit.md"]}
 {"id": "t045", "question": "What does management review need to do with internal audit results to meet ISO 9001?", "expected_category": "reference", "source": "developer", "expected_sources": ["management_review_audit_link.md"]}
 {"id": "t046", "question": "What are the indicators of a broken audit-to-management-review linkage?", "expected_category": "reference", "source": "developer", "expected_sources": ["management_review_audit_link.md"]}
-{"id": "t047", "question": "What is the audit evidence collection hierarchy — which evidence type is strongest?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_evidence_collection.md"]}
+{"id": "t047", "question": "What is the audit evidence collection hierarchy \u2014 which evidence type is strongest?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_evidence_collection.md"]}
 {"id": "t048", "question": "What is sampling in audit and how do you determine if a sample is sufficient?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_evidence_collection.md"]}
 {"id": "t049", "question": "What should be in an audit plan notification sent two weeks before the audit?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_planning_execution.md"]}
 {"id": "t050", "question": "What are the common mistakes made at the audit opening meeting?", "expected_category": "procedure", "source": "developer", "expected_sources": ["audit_planning_execution.md"]}
@@ -58,66 +58,66 @@
 {"id": "t058", "question": "What audit questions should I ask to evaluate management review under clause 9.3?", "expected_category": "reference", "source": "developer", "expected_sources": ["management_review_audit_link.md"]}
 {"id": "t059", "question": "What are the practitioner scenarios for handling pressure to soften a finding?", "expected_category": "general", "source": "developer", "expected_sources": ["audit_practitioner_scenarios.md"]}
 {"id": "t060", "question": "What should an auditor do when they find something significant outside the audit scope?", "expected_category": "general", "source": "developer", "expected_sources": ["audit_practitioner_scenarios.md"]}
-{"id": "t061", "question": "My supplier just told me their calibration is fine because everything is within spec — is that enough?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t062", "question": "We did a 5-Why but the root cause is just 'operator error' — is that acceptable?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t063", "question": "The auditee says their risk register is in their head — can I accept that?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t061", "question": "My supplier just told me their calibration is fine because everything is within spec \u2014 is that enough?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t062", "question": "We did a 5-Why but the root cause is just 'operator error' \u2014 is that acceptable?", "expected_category": "procedure", "source": "blind_practitioner"}
+{"id": "t063", "question": "The auditee says their risk register is in their head \u2014 can I accept that?", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t064", "question": "Can I close an NCR if the corrective action plan looks good but implementation hasn't started?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t065", "question": "My internal audit found the same calibration gap three years in a row — how should I grade it now?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t066", "question": "The supplier quality manager answers every question before the operator can speak — what do I do?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t065", "question": "My internal audit found the same calibration gap three years in a row \u2014 how should I grade it now?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t066", "question": "The supplier quality manager answers every question before the operator can speak \u2014 what do I do?", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t067", "question": "Is it a finding if the supplier doesn't have a formal risk register, just FMEAs?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t068", "question": "The SPC chart shows out-of-control signals but production kept running — how do I grade this?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t068", "question": "The SPC chart shows out-of-control signals but production kept running \u2014 how do I grade this?", "expected_category": "example", "source": "blind_practitioner"}
 {"id": "t069", "question": "What is the minimum viable auditor pool size for a mid-size manufacturer?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t070", "question": "My supplier changed tooling without telling us — is that a major NCR?", "expected_category": "example", "source": "blind_practitioner"}
-{"id": "t071", "question": "The control plan hasn't been updated since the PFMEA was revised 14 months ago — what grade?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t070", "question": "My supplier changed tooling without telling us \u2014 is that a major NCR?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t071", "question": "The control plan hasn't been updated since the PFMEA was revised 14 months ago \u2014 what grade?", "expected_category": "example", "source": "blind_practitioner"}
 {"id": "t072", "question": "Can I do a process audit by reviewing the procedure documents or do I need to go to the floor?", "expected_category": "reference", "source": "blind_practitioner"}
-{"id": "t073", "question": "The supplier's GR&R came back at 22% — do I write a finding?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t074", "question": "I found nonconforming product in the shipping area at 4pm on the last audit day — what do I do?", "expected_category": "example", "source": "blind_practitioner"}
-{"id": "t075", "question": "The auditee says they cascade customer requirements to sub-tiers verbally — is that okay?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t073", "question": "The supplier's GR&R came back at 22% \u2014 do I write a finding?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t074", "question": "I found nonconforming product in the shipping area at 4pm on the last audit day \u2014 what do I do?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t075", "question": "The auditee says they cascade customer requirements to sub-tiers verbally \u2014 is that okay?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t076", "question": "Is training alone an acceptable corrective action for a systemic process gap?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t077", "question": "The management review was 20 minutes long and covered only customer satisfaction — is that a finding?", "expected_category": "reference", "source": "blind_practitioner"}
+{"id": "t077", "question": "The management review was 20 minutes long and covered only customer satisfaction \u2014 is that a finding?", "expected_category": "reference", "source": "blind_practitioner"}
 {"id": "t078", "question": "What questions should I ask the operator during a process audit to check SC awareness?", "expected_category": "reference", "source": "blind_practitioner"}
-{"id": "t079", "question": "My supplier says the PPAP is not required because the design didn't change — but the raw material supplier changed", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t079", "question": "My supplier says the PPAP is not required because the design didn't change \u2014 but the raw material supplier changed", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t080", "question": "What does 'fitness for purpose' mean for a measuring instrument?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t081", "question": "The expired interim approval was from 7 months ago and 3200 units shipped — how do I grade this?", "expected_category": "example", "source": "blind_practitioner"}
-{"id": "t082", "question": "I want to conduct a remote supplier audit — what do I need to check before I start?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t083", "question": "The supplier's documents all look perfect but the shop floor tells a different story — what's the finding?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t081", "question": "The expired interim approval was from 7 months ago and 3200 units shipped \u2014 how do I grade this?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t082", "question": "I want to conduct a remote supplier audit \u2014 what do I need to check before I start?", "expected_category": "procedure", "source": "blind_practitioner"}
+{"id": "t083", "question": "The supplier's documents all look perfect but the shop floor tells a different story \u2014 what's the finding?", "expected_category": "example", "source": "blind_practitioner"}
 {"id": "t084", "question": "Can a for-cause audit be done remotely?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t085", "question": "The supplier submitted a corrective action but it addresses the symptom not the root cause — what do I do?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t086", "question": "Three minors in the same audit all traceable to one root cause — do I combine them into a major?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t085", "question": "The supplier submitted a corrective action but it addresses the symptom not the root cause \u2014 what do I do?", "expected_category": "procedure", "source": "blind_practitioner"}
+{"id": "t086", "question": "Three minors in the same audit all traceable to one root cause \u2014 do I combine them into a major?", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t087", "question": "What is the ndc requirement for a capable measurement system?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t088", "question": "The supplier has zero calibration failures in 5 years — should I be suspicious?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t089", "question": "How do I audit the corrective action system itself — not just individual CAs?", "expected_category": "reference", "source": "blind_practitioner"}
-{"id": "t090", "question": "A supplier wants to add customer context to soften a finding at closing — how do I handle it?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t088", "question": "The supplier has zero calibration failures in 5 years \u2014 should I be suspicious?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t089", "question": "How do I audit the corrective action system itself \u2014 not just individual CAs?", "expected_category": "reference", "source": "blind_practitioner"}
+{"id": "t090", "question": "A supplier wants to add customer context to soften a finding at closing \u2014 how do I handle it?", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t091", "question": "What is a product audit and how is it different from final inspection?", "expected_category": "reference", "source": "blind_practitioner"}
 {"id": "t092", "question": "How do I know if the internal audit programme is risk-based or just going through the motions?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t093", "question": "My manager is telling me to soften the finding because the supplier is critical — what do I do?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t094", "question": "The supplier presented only pre-selected documents during the remote audit — what do I do?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t093", "question": "My manager is telling me to soften the finding because the supplier is critical \u2014 what do I do?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t094", "question": "The supplier presented only pre-selected documents during the remote audit \u2014 what do I do?", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t095", "question": "What is the difference between corrective action and preventive action?", "expected_category": "procedure", "source": "blind_practitioner"}
-{"id": "t096", "question": "I need to audit ISO 9001 clause 8.4 — what evidence should I look for?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t096", "question": "I need to audit ISO 9001 clause 8.4 \u2014 what evidence should I look for?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t097", "question": "When does a quality escape from a supplier require immediate customer notification?", "expected_category": "example", "source": "blind_practitioner"}
 {"id": "t098", "question": "What does the phrase 'documented information' cover in ISO 9001?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t099", "question": "My supplier's corrective action plan says they will retrain — is that enough for a systemic finding?", "expected_category": "procedure", "source": "blind_practitioner"}
+{"id": "t099", "question": "My supplier's corrective action plan says they will retrain \u2014 is that enough for a systemic finding?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t100", "question": "What is a PFMEA and how do I verify it's connected to the control plan during an audit?", "expected_category": "standard", "source": "blind_practitioner"}
-{"id": "t101", "question": "The internal audit only covers 4 out of 10 processes every year — is that a major?", "expected_category": "example", "source": "blind_practitioner"}
+{"id": "t101", "question": "The internal audit only covers 4 out of 10 processes every year \u2014 is that a major?", "expected_category": "example", "source": "blind_practitioner"}
 {"id": "t102", "question": "What cleanroom class is required for semiconductor final process steps?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t103", "question": "What lot traceability requirements apply to GaN-on-Silicon substrate manufacturing?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t104", "question": "What AS9100D clause covers product safety and what does it require?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t105", "question": "When is a sub-tier supplier change a PPAP-triggering event in an automotive supply chain?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t106", "question": "How do I audit customer satisfaction monitoring — what are the four steps?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t106", "question": "How do I audit customer satisfaction monitoring \u2014 what are the four steps?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t107", "question": "What does it mean for improvement to be sustained rather than a one-time fix?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t108", "question": "How should I handle a supplier who refuses to let me see a specific process area?", "expected_category": "example", "source": "blind_practitioner"}
-{"id": "t109", "question": "What is the observation grade — when does an observation become a minor NCR?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t110", "question": "I'm auditing a new process that was introduced after the annual audit plan was set — what do I do?", "expected_category": "procedure", "source": "blind_practitioner"}
+{"id": "t109", "question": "What is the observation grade \u2014 when does an observation become a minor NCR?", "expected_category": "general", "source": "blind_practitioner"}
+{"id": "t110", "question": "I'm auditing a new process that was introduced after the annual audit plan was set \u2014 what do I do?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t111", "question": "What is the difference between an MSA repeat requirement after gauge replacement vs after operator change?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t112", "question": "What documents should I request in advance for a remote ISO 9001 system audit?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t113", "question": "How do I structure a process audit using the turtle diagram?", "expected_category": "reference", "source": "blind_practitioner"}
 {"id": "t114", "question": "What is a positive observation and when should it be included in an audit report?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t115", "question": "How do I verify that a supplier is genuinely monitoring sub-tier performance?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t116", "question": "What is the standard of proof required to write an audit finding?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t117", "question": "My supplier's improvement projects all show 'complete' but no before/after measurements — finding?", "expected_category": "standard", "source": "blind_practitioner"}
+{"id": "t117", "question": "My supplier's improvement projects all show 'complete' but no before/after measurements \u2014 finding?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t118", "question": "What is the 4-question test for deciding between an observation and a minor NCR?", "expected_category": "general", "source": "blind_practitioner"}
 {"id": "t119", "question": "How do I detect if a supplier's clean audit record might be due to soft auditing?", "expected_category": "general", "source": "blind_practitioner"}
-{"id": "t120", "question": "What is the correct way to write a finding — what tense and voice should I use?", "expected_category": "procedure", "source": "blind_practitioner"}
+{"id": "t120", "question": "What is the correct way to write a finding \u2014 what tense and voice should I use?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t121", "question": "Should root cause be included in the finding statement?", "expected_category": "procedure", "source": "blind_practitioner"}
 {"id": "t122", "question": "What is the AS9100D requirement for record retention on safety-critical parts?", "expected_category": "standard", "source": "blind_practitioner"}
 {"id": "t123", "question": "What triggers an immediate supplier suspension versus conditional approval?", "expected_category": "procedure", "source": "blind_practitioner"}
@@ -147,7 +147,7 @@
 {"id": "t147", "question": "What is the difference between ISO 9001 and ISO 45001?", "expected_category": "OUT_OF_SCOPE", "source": "adversarial"}
 {"id": "t148", "question": "How do I write a business case for a quality system investment?", "expected_category": "OUT_OF_SCOPE", "source": "adversarial"}
 {"id": "t149", "question": "What is the best way to implement a Kaizen programme?", "expected_category": "OUT_OF_SCOPE", "source": "adversarial"}
-{"id": "t150", "question": "How do I certify my company to ISO 9001 — what is the process with a certification body?", "expected_category": "OUT_OF_SCOPE", "source": "adversarial"}
+{"id": "t150", "question": "How do I certify my company to ISO 9001 \u2014 what is the process with a certification body?", "expected_category": "OUT_OF_SCOPE", "source": "adversarial"}
 {"id": "t151", "question": "What is the IATF 16949 requirement for a control plan when no special characteristics exist?", "expected_category": "standard", "source": "adversarial_edge"}
 {"id": "t152", "question": "Can an auditor close a finding based on a verbal promise from the quality manager?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t153", "question": "Is there any situation where root cause is not required for corrective action?", "expected_category": "procedure", "source": "adversarial_edge"}
@@ -162,11 +162,11 @@
 {"id": "t162", "question": "If the auditee provides new evidence after the closing meeting, must the auditor review it?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t163", "question": "Can an organisation use a single document to satisfy both clause 6.1 risk assessment and clause 9.3 management review?", "expected_category": "general", "source": "adversarial_edge"}
 {"id": "t164", "question": "Is it acceptable to use the same auditor for the same process two years in a row?", "expected_category": "reference", "source": "adversarial_edge"}
-{"id": "t165", "question": "What if the PFMEA and control plan are inconsistent — which one takes precedence in an audit?", "expected_category": "standard", "source": "adversarial_edge"}
+{"id": "t165", "question": "What if the PFMEA and control plan are inconsistent \u2014 which one takes precedence in an audit?", "expected_category": "standard", "source": "adversarial_edge"}
 {"id": "t166", "question": "Can a supplier self-certify effectiveness of corrective action without an auditor follow-up visit?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t167", "question": "Does every process in the audit programme need to be audited at the same frequency?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t168", "question": "If a supplier has ISO 9001 certification, do they still need a second-party audit?", "expected_category": "procedure", "source": "adversarial_edge"}
-{"id": "t169", "question": "Can I audit a process that is currently in a planned shutdown — does it count toward programme coverage?", "expected_category": "procedure", "source": "adversarial_edge"}
+{"id": "t169", "question": "Can I audit a process that is currently in a planned shutdown \u2014 does it count toward programme coverage?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t170", "question": "Is a use-as-is disposition acceptable without customer approval in semiconductor manufacturing?", "expected_category": "standard", "source": "adversarial_edge"}
 {"id": "t171", "question": "What happens if a corrective action is implemented but the same finding recurs at the next audit?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t172", "question": "Can a checklist alone constitute an audit report?", "expected_category": "procedure", "source": "adversarial_edge"}
@@ -186,5 +186,5 @@
 {"id": "t186", "question": "What is the difference between an audit scope and an audit objective?", "expected_category": "procedure", "source": "adversarial_edge"}
 {"id": "t187", "question": "Can a product audit substitute for a process audit in the IATF 16949 programme?", "expected_category": "reference", "source": "adversarial_edge"}
 {"id": "t188", "question": "Is a supplier's claim that they are 'working on it' sufficient to extend an NCR deadline?", "expected_category": "procedure", "source": "adversarial_edge"}
-{"id": "t189", "question": "What if the auditor is unsure whether the evidence supports a finding — what is the correct action?", "expected_category": "general", "source": "adversarial_edge"}
+{"id": "t189", "question": "What if the auditor is unsure whether the evidence supports a finding \u2014 what is the correct action?", "expected_category": "general", "source": "adversarial_edge"}
 {"id": "t190", "question": "Can customer commercial pressure ever justify withdrawing a major NCR without new evidence?", "expected_category": "general", "source": "adversarial_edge"}
