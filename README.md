@@ -6,6 +6,10 @@ RAG-based expert Q&A assistant for quality engineers conducting or preparing for
 
 ---
 
+![Auditor Expert screenshot](docs/screenshot.png)
+
+---
+
 ## What it does
 
 Answers practitioner audit questions grounded strictly in a curated knowledge base:

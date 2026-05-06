@@ -438,7 +438,8 @@ async def answer(question: str) -> dict:
     if _is_injection(question):
         return {"answer": "I cannot answer this based on the provided context.",
                 "sources": [], "retrieval_query": "", "latency": 0.0,
-                "confidence": "low", "action_required": False, "overall_score": 0.0}
+                "confidence": "low", "action_required": False,
+                "insufficient_evidence": True, "overall_score": 0.0}
 
     anthropic_client = AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     openai_client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -468,7 +469,8 @@ async def answer(question: str) -> dict:
             "answer": "The knowledge base does not contain information relevant to this question.",
             "sources": [],
             "confidence": "low",
-            "action_required": False
+            "action_required": False,
+            "insufficient_evidence": True
         }
 
     context_parts = []
@@ -515,6 +517,9 @@ async def answer(question: str) -> dict:
     action_keywords = ("major", "critical", "nonconformity", "ncr", "corrective action", "requires")
     action_required = any(kw in final_answer.lower() for kw in action_keywords)
     confidence = _confidence_label(overall_score)
+    insufficient_evidence = any(p in final_answer.lower() for p in (
+        "cannot answer", "does not contain", "not contain sufficient", "no information"
+    ))
 
     # Push scores to Langfuse if decorator context available
     if _LANGFUSE_AVAILABLE and langfuse_context:
@@ -555,5 +560,6 @@ async def answer(question: str) -> dict:
         "latency": latency,
         "confidence": confidence,
         "action_required": action_required,
+        "insufficient_evidence": insufficient_evidence,
         "overall_score": overall_score
     }
