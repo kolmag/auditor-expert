@@ -88,6 +88,7 @@ Judge: `claude-sonnet-4-6`. Multi-dimensional scoring: correctness (40%), comple
 | Run | Overall | MRR | NDCG | Key change |
 |---|---|---|---|---|
 | Run 1 (ablation) | 6.98 | 0.375 | 0.753 | BGE-large + ms-marco — wrong stack, documented as ablation |
+| Run 2 | — | — | — | First correct-stack ingest (text-embedding-3-small + bge-reranker-v2-m3) — eval not completed, used as ingest baseline |
 | Run 3 | 6.87 | 0.364 | 0.757 | OSS-120B answer + OSS-20B checker, keyword rewriter |
 | Run 4 | 7.58 | 0.365 | 0.781 | Multi-dim judge + strict compliance ANSWER_SYSTEM |
 | Run 5 (HyDE) | 7.28 | 0.808 | 1.828 | HyDE query rewriting — MRR +0.44, overall -0.3 (reranker input bug) |
@@ -245,6 +246,104 @@ Full 60-question developer eval: ~8 minutes on T4. Full 610-question eval: ~80 m
 
 ---
 
+---
+
+## Multi-model benchmark
+
+Same 610-question eval set, retrieval and reranking fixed, only the answer/rewrite/check model stack varied. All runs on Colab T4/L4 GPU.
+
+| Stack | Answer model | Rewriter | Checker | Overall | Cost/610q | Notes |
+|---|---|---|---|---|---|---|
+| GPT-4o-mini baseline | GPT-4o-mini | GPT-4o-mini | GPT-4o-mini | 7.289 | $4.77 | Baseline |
+| OSS-120B + Haiku | OSS-120B | Claude Haiku 4.5 | Claude Haiku 4.5 | 7.836 | $5.10 | — |
+| OSS-120B + DS Flash | OSS-120B | DeepSeek Flash | DeepSeek Flash | 7.703 | $2.84 | Dominated |
+| Qwen3-32B | Qwen3-32B | Qwen3-32B | Qwen3-32B | 6.992 | $5.31 | Eliminated — OUT_OF_SCOPE failures |
+| **OSS-120B full (production)** | **OSS-120B** | **OSS-120B** | **OSS-20B** | **8.083** | **$1.80** | **Pareto-optimal** |
+
+**Key finding:** the rewriter has higher leverage than the answer model. Switching from Haiku to OSS-120B as rewriter improved scores more than switching answer models. The full OSS stack (OSS-120B answer + OSS-120B rewrite + OSS-20B check) is Pareto-optimal — highest score at lowest cost of any tested stack.
+
+**Eliminated models:**
+- Qwen3-32B: OUT_OF_SCOPE failure rate exceeded 10% — disqualified
+- GPT-4o: skipped — OSS-120B already outperforms at 1/10th the cost
+- DS Flash stack: dominated by OSS-120B full (lower score, higher cost)
+
+**Cost at scale (production OSS-120B stack, $1.80/610q):**
+
+| Volume | Est. cost |
+|---|---|
+| 1,000 queries/month | ~$3 |
+| 10,000 queries/month | ~$30 |
+| 100,000 queries/month | ~$295 |
+
+Judge cost (Claude Sonnet, eval only) not included — eval runs as needed, not per query.
+
+---
+
+---
+
+## Lessons learned
+
+Key findings from building this app that apply to any production RAG system:
+
+**HyDE rewriter has higher leverage than the answer model.** Switching from keyword expansion to HyDE improved MRR from 0.36 to 0.90. Switching answer models moved scores by 0.3–0.5 points at most. Invest in retrieval quality first — the answer model can only work with what retrieval gives it.
+
+**Temperature=0 on enrichment is non-negotiable.** Non-zero temperature produces different headlines on every re-ingest, making eval scores non-comparable across runs. Discovered after three regression cycles. One line, zero cost — set it on day one.
+
+**Pass the HyDE paragraph to the reranker, not the original question.** Using HyDE for ChromaDB retrieval but the original short question for BGE reranking creates a vocabulary mismatch that degrades reranking precision. Both steps should receive the same enriched query.
+
+**FINDING anchors are the fix for worked example retrieval.** Without them, generic enrichment headlines ("Major NCR for supplier control gap") compete with every other NCR-related chunk. With them, the enrichment model reproduces the specific NCR ID in the headline — the HyDE for that question opens with the same ID, and cosine similarity maximises. Example category MRR went from near-zero to 1.0.
+
+**The checker strips too aggressively without a short-answer guard.** The NLI checker correctly strips unsupported claims, but on short factual answers it strips citations and leaves bare claims — which then score low on groundedness. Preserve both claim and citation if the answer is under 50 words and the claim is plausible from context.
+
+**Empty answers score 0 — always add a fallback.** When the checker strips everything, it returns an empty string. An empty string scores 0 from the judge, which is indistinguishable from a genuine failure. Return a clean decline string instead.
+
+**Judge API errors silently score 0.** Transient 500 errors during a long eval run produce 0/0/0/0 scores via the error fallback. Always rerun zero-score questions before treating them as genuine failures — run-level zeros are often API noise, not pipeline failures.
+
+**Wrong expected_sources labels corrupt MRR as badly as wrong retrieval.** A question correctly retrieving the right document but labelled with a different expected source scores MRR=0. Audit your ground-truth labels before interpreting retrieval metrics.
+
+**Prompt injection must be blocked before retrieval, not in the answer prompt.** By the time the answer model sees the question, it has seven chunks of domain content to answer from. An instruction in the system prompt to "decline injection attempts" competes with that context and often loses. Pattern-match before retrieval runs — zero latency, reliable.
+
+---
+
+## From portfolio to production
+
+This project is production-quality in architecture and evaluation rigour. The gap to industrial deployment is infrastructure, not AI quality:
+
+**Security and access control**
+- API keys via secrets manager (AWS Secrets Manager, Azure Key Vault) — not `.env` files
+- Role-based access: not all users should access all audit programmes or supplier findings
+- Query and answer audit trail — regulatory requirement in ISO 9001 and IATF 16949 environments
+- Data residency controls — some industries require data to stay within specific regions
+
+**Scalability**
+- Replace ChromaDB with a managed vector store (Pinecone, Qdrant Cloud, Weaviate) for concurrent multi-user access
+- Containerise with Docker, deploy on managed container service (ECS, Cloud Run, AKS)
+- Rate limiting and request queuing for high-volume usage
+- Response caching for frequently asked questions
+
+**Knowledge base management**
+- Document versioning — when ISO 9001:2025 or IATF 16949 rev 2 is published, chunks must update without losing audit history
+- Customer-specific requirements (CSRs) may be confidential — KB access controls needed
+- Scheduled re-ingestion when source standards are revised
+- Change detection to identify which chunks are affected by a standard update
+
+**Reliability**
+- Fallback models if primary provider (Groq) is unavailable — at minimum, a secondary answer model
+- Exponential backoff with jitter on all API calls
+- Health checks and uptime monitoring
+- Graceful degradation — return cached answers or decline cleanly if all providers are down
+
+**Evaluation in production**
+- Online evaluation via user feedback (thumbs up/down) feeding back into KB improvement
+- A/B testing framework for prompt and model updates without full re-evaluation
+- Drift detection — monitor if answer quality degrades as KB grows or user question patterns shift
+- Per-tenant evaluation if deployed across multiple customers with different standard scopes
+
+**Intent classification**
+- Pre-retrieval classifier to cleanly decline topic-drift questions (business case writing, HR, legal) that partially overlap with KB vocabulary — the current pattern-match approach handles injection but not semantic scope drift
+
+---
+
 ## Key design decisions
 
 **HyDE query rewriting** — instead of keyword expansion, the rewriter generates a 2–3 sentence hypothetical document excerpt matching the vocabulary of the target document type. Routing rules in the prompt map question patterns to specific document vocabularies. MRR improved from 0.36 to 0.90 across development runs. The HyDE paragraph is passed to both ChromaDB and BGE — passing the original short question to BGE while using HyDE for retrieval produces a vocabulary mismatch that degrades reranking precision.
@@ -258,5 +357,7 @@ Full 60-question developer eval: ~8 minutes on T4. Full 610-question eval: ~80 m
 **Actor/critic groundedness** — OSS-20B reviews every answer and strips unsupported claims. Empty-answer guard returns a clean decline rather than an empty string when the checker strips everything. Short-answer protection rule preserves citations on factual answers under 50 words.
 
 **Prompt injection defence** — pre-retrieval pattern match blocks injection attempts before the pipeline runs (0ms latency). Vocabulary-based blocking deliberately avoided — terms like "ignore", "output", and "raw" appear in legitimate audit questions.
+
+**Stop sequences on all structured calls** — `stop_sequences=["```", "\n\n\n"]` on every judge, checker, and enrichment call. Prevents the model from generating trailing explanation text after the closing JSON brace. Reduces latency and token cost on every structured output call without changing response quality.
 
 **Known limitation** — topic-drift questions where out-of-scope content (business case writing, financial planning) partially overlaps with KB vocabulary may receive a KB-grounded but off-topic response. The correct fix is a pre-retrieval intent classifier. Documented as a future improvement.

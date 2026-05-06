@@ -223,6 +223,7 @@ async def check_groundedness(client: AsyncOpenAI, answer: str, context: str) -> 
             model=CHECKER_MODEL,
             max_tokens=2500,
             temperature=0,
+            stop=["```", "\n\n\n"],
             messages=[
                 {"role": "system", "content": CHECKER_SYSTEM},
                 {"role": "user", "content": f"CONTEXT:\n{context}\n\nANSWER TO CHECK:\n{answer}"}

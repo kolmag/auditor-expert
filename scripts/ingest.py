@@ -127,6 +127,10 @@ def enrich_chunk(client: anthropic.Anthropic, chunk_text: str, doc_category: str
             model=ENRICHMENT_MODEL,
             max_tokens=600,
             temperature=0,   # CRITICAL — deterministic embeddings, comparable evals
+            stop_sequences=["```", "
+
+
+"],
             system=ENRICHMENT_PROMPT,
             messages=[
                 {
